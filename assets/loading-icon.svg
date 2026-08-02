@@ -6,11 +6,21 @@
     66.6667% { transform: rotate(240deg); }
     100%    { transform: rotate(360deg); }
   }
+  /* centroid of the three circle centers (256,178) / (159,334) / (352,334) —
+     the icon's true rotational center, not the viewBox center */
+  .scale-wrapper {
+    transform-origin: 255.67px 282px;
+    /* shrunk so the circles clear the viewBox edges at every rotation angle,
+       not just when upright (the farthest circle edge is ~238 units from the
+       pivot, and the closest viewBox edge is only ~230 units away) */
+    transform: scale(0.9);
+  }
   .spin-group {
-    transform-origin: 256px 256px;
+    transform-origin: 255.67px 282px;
     animation: spin-120 1.8s cubic-bezier(0.85, 0, 0.15, 1) infinite;
   }
 </style>
+<g class="scale-wrapper">
 <g class="spin-group">
 <circle cx="159" cy="334" r="128" fill="#FF8000"/>
 <circle cx="352" cy="334" r="128" fill="#40BCF4"/>
@@ -19,5 +29,6 @@
 <path d="M159 206C219.036 206 269.416 247.333 283.241 303.094C274.462 304.997 265.348 306 256 306C195.964 306 145.583 264.667 131.758 208.905C140.537 207.002 149.651 206 159 206Z" fill="#FFE000"/>
 <path d="M352.001 206C361.686 206 371.12 207.078 380.189 209.116C366.29 264.771 315.961 306 256.001 306C246.316 306 236.882 304.921 227.812 302.883C241.713 247.228 292.041 206 352.001 206Z" fill="#00EFF0"/>
 <path d="M255.501 249.906C268.623 264.952 278.284 283.095 283.242 303.094C274.463 304.997 265.349 306 256.001 306C246.316 306 236.882 304.921 227.812 302.883C232.787 282.967 242.425 264.899 255.501 249.906Z" fill="white"/>
+</g>
 </g>
 </svg>
