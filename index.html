@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Letterboxd Watchlist Matcher</title>
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>Letterboxd Watchlist Matcher</h1>
+    <p class="subtitle">
+      Enter a few Letterboxd usernames and find the movies on more than one of their watchlists.
+    </p>
+  </header>
+
+  <main>
+    <form id="matcher-form">
+      <div id="username-rows" class="username-rows"></div>
+
+      <div class="form-actions">
+        <button type="button" id="add-row-btn" class="btn btn-secondary">+ Add another account</button>
+        <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
+      </div>
+
+      <p id="form-hint" class="form-hint">Enter at least 2 usernames to compare.</p>
+    </form>
+
+    <section id="status" class="status" hidden aria-live="polite"></section>
+
+    <section id="errors" class="errors" hidden></section>
+
+    <section id="results" class="results"></section>
+  </main>
+
+  <footer class="page-footer">
+    <p>
+      Not affiliated with Letterboxd. Reads public watchlist pages only &mdash;
+      be considerate with how many accounts and how often you run this.
+    </p>
+  </footer>
+
+  <script src="app.js?v=1" defer></script>
+</body>
+</html>
