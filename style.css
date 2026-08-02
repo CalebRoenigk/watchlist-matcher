@@ -1,24 +1,31 @@
 :root {
-  --bg: #14181c;
-  --bg-elevated: #1c2228;
-  --border: #2c3440;
+  /* Letterboxd-inspired dark theme, anchored on the requested background */
+  --bg: #1a272b;
+  --bg-elevated: #24363c;
+  --bg-elevated-2: #2f454d;
+  --border: #3a5761;
   --text: #e8eaed;
-  --text-muted: #9ab;
+  --text-muted: #8ba3ad;
+
+  /* Letterboxd's rating/heart accent trio */
   --accent: #00e054;
   --accent-2: #40bcf4;
   --accent-3: #ff8000;
   --danger: #ff6b6b;
-  --radius: 8px;
-}
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f4f5f7;
-    --bg-elevated: #ffffff;
-    --border: #dbdfe4;
-    --text: #14181c;
-    --text-muted: #5c6773;
-  }
+  --radius: 6px;
+  --radius-sm: 4px;
+
+  /* Letterboxd's actual button surface colors */
+  --btn-primary-surface: #00ac1c;
+  --btn-primary-surface-hover: #00c030;
+  --btn-primary-surface-active: #009926;
+  --btn-primary-text: #f4fcf0;
+
+  --btn-secondary-surface: #3d5966;
+  --btn-secondary-surface-hover: #4c6f7d;
+  --btn-secondary-surface-active: #33505c;
+  --btn-secondary-text: #c8d4e0;
 }
 
 * {
@@ -83,17 +90,23 @@ main {
 }
 
 .remove-row-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
+  background: transparent;
   color: var(--text-muted);
-  border-radius: var(--radius);
-  width: 2.5rem;
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.remove-row-btn:hover {
+.remove-row-btn:hover:not(:disabled) {
   color: var(--danger);
   border-color: var(--danger);
 }
@@ -111,30 +124,55 @@ main {
 }
 
 .btn {
-  padding: 0.6rem 1.1rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  font-size: 0.95rem;
+  height: 2.25rem;
+  padding: 0 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
   cursor: pointer;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.15);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-secondary {
-  background: var(--bg-elevated);
-  color: var(--text);
+  background: var(--btn-secondary-surface);
+  color: var(--btn-secondary-text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--btn-secondary-surface-hover);
+  color: #fff;
+}
+
+.btn-secondary:active:not(:disabled) {
+  background: var(--btn-secondary-surface-active);
 }
 
 .btn-primary {
-  background: var(--accent);
-  color: #06210f;
-  border-color: var(--accent);
-  font-weight: 600;
+  background: var(--btn-primary-surface);
+  color: var(--btn-primary-text);
 }
 
-.btn-primary:disabled {
-  background: var(--border);
-  color: var(--text-muted);
-  border-color: var(--border);
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-primary-surface-hover);
+  color: #fff;
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--btn-primary-surface-active);
+}
+
+.btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .form-hint {
@@ -263,14 +301,54 @@ main {
   text-decoration: underline;
 }
 
-.film-year {
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-.film-matched-users {
+.film-meta {
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+.film-avatars {
+  display: flex;
+  align-items: center;
+  margin-top: 0.1rem;
+}
+
+.film-avatar-link {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--bg-elevated);
+  background: var(--bg-elevated-2);
+  margin-left: -8px;
+  transition: transform 0.1s ease;
+}
+
+.film-avatars > :first-child {
+  margin-left: 0;
+}
+
+.film-avatar-link:hover {
+  transform: translateY(-2px);
+}
+
+.film-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.film-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
 }
 
 .page-footer {

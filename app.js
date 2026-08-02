@@ -13,7 +13,7 @@ const WORKER_BASE_URL =
 const MIN_USERNAMES = 2;
 const MAX_PAGES = 60; // safety cap (~1680 films/user)
 const PAGE_DELAY_MS_RANGE = [150, 250]; // politeness delay between paginated requests
-const POSTER_CONCURRENCY = 5;
+const FILM_DETAILS_CONCURRENCY = 5;
 
 // --- Errors -------------------------------------------------------------
 
@@ -75,6 +75,7 @@ async function fetchWatchlistForUser(username, onProgress) {
   const films = [];
   const seenSlugs = new Set();
   let truncated = false;
+  let avatarUrl = null;
   const encodedUsername = encodeURIComponent(username);
 
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -105,6 +106,10 @@ async function fetchWatchlistForUser(username, onProgress) {
       }
     });
 
+    if (page === 1) {
+      avatarUrl = doc.querySelector(".profile-mini-person .avatar img")?.getAttribute("src") || null;
+    }
+
     onProgress?.(`@${username}: page ${page} (${films.length} found so far)`);
 
     if (!hasNextPage(doc)) break;
@@ -116,7 +121,7 @@ async function fetchWatchlistForUser(username, onProgress) {
     await randomDelay(PAGE_DELAY_MS_RANGE);
   }
 
-  return { username, films, truncated };
+  return { username, films, truncated, avatarUrl };
 }
 
 async function fetchAllWatchlists(usernames, onProgress) {
@@ -160,9 +165,43 @@ function filterAndRank(map) {
     .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title));
 }
 
-// --- Posters (bounded to the ranked/filtered set only) ---------------------
+// --- Film details: poster + runtime (bounded to the ranked/filtered set only) -
 
-async function fetchPostersWithConcurrency(films, concurrency, onProgress) {
+// Letterboxd film pages embed a schema.org JSON-LD block wrapped in a CDATA-style
+// comment (not valid on its own — the comment markers must be stripped first).
+function parseFilmJsonLd(doc) {
+  const script = doc.querySelector('script[type="application/ld+json"]');
+  if (!script) return null;
+  try {
+    const cleaned = script.textContent
+      .replace("/* <![CDATA[ */", "")
+      .replace("/* ]]> */", "")
+      .trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
+
+// Runtimes are ISO 8601 durations, e.g. "PT1H22M".
+function parseRuntimeMinutes(isoDuration) {
+  if (!isoDuration) return null;
+  const match = isoDuration.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!match) return null;
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const total = hours * 60 + minutes + Math.round(seconds / 60);
+  return total > 0 ? total : null;
+}
+
+function extractFilmDetails(doc) {
+  const posterUrl = doc.querySelector('meta[property="og:image"]')?.getAttribute("content") || null;
+  const runtimeMinutes = parseRuntimeMinutes(parseFilmJsonLd(doc)?.duration);
+  return { posterUrl, runtimeMinutes };
+}
+
+async function fetchFilmDetailsWithConcurrency(films, concurrency, onProgress) {
   let nextIndex = 0;
   let completed = 0;
 
@@ -173,10 +212,12 @@ async function fetchPostersWithConcurrency(films, concurrency, onProgress) {
         const res = await fetch(`${WORKER_BASE_URL}/film/${encodeURIComponent(film.slug)}/`);
         if (!res.ok) throw new Error("bad status");
         const doc = new DOMParser().parseFromString(await res.text(), "text/html");
-        film.posterUrl =
-          doc.querySelector('meta[property="og:image"]')?.getAttribute("content") || null;
+        const { posterUrl, runtimeMinutes } = extractFilmDetails(doc);
+        film.posterUrl = posterUrl;
+        film.runtimeMinutes = runtimeMinutes;
       } catch {
         film.posterUrl = null;
+        film.runtimeMinutes = null;
       }
       completed++;
       onProgress?.(completed, films.length);
@@ -187,9 +228,57 @@ async function fetchPostersWithConcurrency(films, concurrency, onProgress) {
   await Promise.all(workers);
 }
 
+function formatRuntime(minutes) {
+  if (!minutes) return null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins} min`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
 // --- Rendering --------------------------------------------------------
 
-function renderFilmCard(film) {
+function makeAvatarFallback(username) {
+  const div = document.createElement("div");
+  div.className = "film-avatar-fallback";
+  div.textContent = username.charAt(0).toUpperCase();
+  return div;
+}
+
+function renderAvatar(username, avatarUrl) {
+  const link = document.createElement("a");
+  link.className = "film-avatar-link";
+  link.href = `https://letterboxd.com/${encodeURIComponent(username)}/`;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.title = `@${username}`;
+
+  if (avatarUrl) {
+    const img = document.createElement("img");
+    img.className = "film-avatar";
+    img.src = avatarUrl;
+    img.alt = `@${username}`;
+    img.loading = "lazy";
+    img.addEventListener("error", () => img.replaceWith(makeAvatarFallback(username)), { once: true });
+    link.appendChild(img);
+  } else {
+    link.appendChild(makeAvatarFallback(username));
+  }
+
+  return link;
+}
+
+function renderAvatarStack(usernames, userAvatars) {
+  const container = document.createElement("div");
+  container.className = "film-avatars";
+  for (const username of usernames) {
+    container.appendChild(renderAvatar(username, userAvatars.get(username)));
+  }
+  return container;
+}
+
+function renderFilmCard(film, userAvatars) {
   const card = document.createElement("div");
   card.className = "film-card";
 
@@ -225,23 +314,25 @@ function renderFilmCard(film) {
   titleLink.rel = "noopener noreferrer";
   titleLink.textContent = film.title;
   titleEl.appendChild(titleLink);
-  if (film.year) {
-    const yearEl = document.createElement("span");
-    yearEl.className = "film-year";
-    yearEl.textContent = ` (${film.year})`;
-    titleEl.appendChild(yearEl);
-  }
   card.appendChild(titleEl);
 
-  const usersEl = document.createElement("div");
-  usersEl.className = "film-matched-users";
-  usersEl.textContent = film.matchedUsernames.map((u) => `@${u}`).join(", ");
-  card.appendChild(usersEl);
+  const metaParts = [];
+  if (film.year) metaParts.push(film.year);
+  const runtimeText = formatRuntime(film.runtimeMinutes);
+  if (runtimeText) metaParts.push(runtimeText);
+  if (metaParts.length > 0) {
+    const metaEl = document.createElement("div");
+    metaEl.className = "film-meta";
+    metaEl.textContent = metaParts.join(" · ");
+    card.appendChild(metaEl);
+  }
+
+  card.appendChild(renderAvatarStack(film.matchedUsernames, userAvatars));
 
   return card;
 }
 
-function renderResultsGrid(ranked, totalOk) {
+function renderResultsGrid(ranked, totalOk, userAvatars) {
   const container = document.getElementById("results");
   container.innerHTML = "";
 
@@ -272,7 +363,7 @@ function renderResultsGrid(ranked, totalOk) {
     const grid = document.createElement("div");
     grid.className = "film-grid";
     for (const film of tiers.get(count)) {
-      grid.appendChild(renderFilmCard(film));
+      grid.appendChild(renderFilmCard(film, userAvatars));
     }
     section.appendChild(grid);
 
@@ -428,18 +519,19 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
+    const userAvatars = new Map(ok.map((r) => [r.username, r.avatarUrl]));
     const map = buildMatchMap(ok);
     const ranked = filterAndRank(map);
 
     if (ranked.length > 0) {
-      showStatus(`Fetching poster art (0/${ranked.length})…`);
-      await fetchPostersWithConcurrency(ranked, POSTER_CONCURRENCY, (done, total) =>
-        showStatus(`Fetching poster art (${done}/${total})…`)
+      showStatus(`Fetching film details (0/${ranked.length})…`);
+      await fetchFilmDetailsWithConcurrency(ranked, FILM_DETAILS_CONCURRENCY, (done, total) =>
+        showStatus(`Fetching film details (${done}/${total})…`)
       );
     }
 
     showStatus(null);
-    renderResultsGrid(ranked, ok.length);
+    renderResultsGrid(ranked, ok.length, userAvatars);
     renderErrorSummary(errors);
   } catch (err) {
     showStatus(null);
