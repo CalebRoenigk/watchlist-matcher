@@ -4,11 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Letterboxd Watchlist Matcher</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="style.css?v=1" />
 </head>
 <body>
   <header class="page-header">
-    <h1>Letterboxd Watchlist Matcher</h1>
+    <div class="title-row">
+      <img src="favicon.svg" alt="" class="title-icon" width="32" height="32" />
+      <h1>Letterboxd Watchlist Matcher</h1>
+    </div>
     <p class="subtitle">
       Enter a few Letterboxd usernames and find the movies on more than one of their watchlists.
     </p>
@@ -26,7 +30,10 @@
       <p id="form-hint" class="form-hint">Enter at least 2 usernames to compare.</p>
     </form>
 
-    <section id="status" class="status" hidden aria-live="polite"></section>
+    <section id="status" class="status" hidden aria-live="polite">
+      <img src="loading-icon.svg" alt="" class="status-icon" width="24" height="24" />
+      <span id="status-text"></span>
+    </section>
 
     <section id="errors" class="errors" hidden></section>
 

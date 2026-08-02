@@ -362,13 +362,23 @@ function renderResultsGrid(ranked, totalOk, userAvatars) {
 
     const grid = document.createElement("div");
     grid.className = "film-grid";
-    for (const film of tiers.get(count)) {
+    for (const film of sortByRuntime(tiers.get(count))) {
       grid.appendChild(renderFilmCard(film, userAvatars));
     }
     section.appendChild(grid);
 
     container.appendChild(section);
   }
+}
+
+// Shortest to longest; unknown runtimes (fetch failed) sort last.
+function sortByRuntime(films) {
+  return films.slice().sort((a, b) => {
+    if (a.runtimeMinutes == null && b.runtimeMinutes == null) return a.title.localeCompare(b.title);
+    if (a.runtimeMinutes == null) return 1;
+    if (b.runtimeMinutes == null) return -1;
+    return a.runtimeMinutes - b.runtimeMinutes || a.title.localeCompare(b.title);
+  });
 }
 
 function renderErrorSummary(errors) {
@@ -397,13 +407,14 @@ function renderErrorSummary(errors) {
 
 function showStatus(message) {
   const statusEl = document.getElementById("status");
+  const statusTextEl = document.getElementById("status-text");
   if (!message) {
     statusEl.hidden = true;
-    statusEl.textContent = "";
+    statusTextEl.textContent = "";
     return;
   }
   statusEl.hidden = false;
-  statusEl.textContent = message;
+  statusTextEl.textContent = message;
 }
 
 // --- Username form UI ---------------------------------------------------
