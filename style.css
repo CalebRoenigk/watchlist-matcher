@@ -1,4 +1,8 @@
 :root {
+  /* Dark-only by design — no light mode. This tells the browser to render
+     native UI (scrollbars, form control chrome, autofill) dark too. */
+  color-scheme: dark;
+
   /* Letterboxd-inspired dark theme, anchored on the requested background */
   --bg: #1a272b;
   --bg-elevated: #24363c;
