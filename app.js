@@ -21,16 +21,17 @@ const CHIP_FADE_MS = 180;
 const CHIP_SLIDE_MS = 200;
 
 // Input-screen -> results-screen transition (GSAP; durations in seconds to
-// match GSAP's own convention, tune freely).
-const HERO_SLIDE_DURATION = 0.65;
-const HERO_SLIDE_EASE = "power3.out";
-const BAR_FADE_DURATION = 0.4;
-const BAR_FADE_EASE = "power2.in";
-const CHIPS_RISE_DELAY = 0.2; // chips start shifting slightly after the bar begins fading
-const CHIPS_RISE_DURATION = 0.6;
-const CHIPS_RISE_EASE = "power3.out";
-const CHIPS_SCALE_UP = 1.08;
-const START_OVER_FADE_DURATION = 0.55;
+// match GSAP's own convention). Each numbered comment below is one entry in
+// the timeline, matching the spec: element, duration, ease, start position.
+const HERO_SLIDE_DURATION = 0.7; // 1. #hero-group, cubic-bezier(.5,0,.5,1), @0s
+const HERO_SLIDE_EASE = "heroEase"; // CustomEase for cubic-bezier(.5,0,.5,1) — see registration below
+const BAR_FADE_DURATION = 0.45; // 2. #username-bar-row fade out, simple ease, @0s
+const CHIPS_AND_STARTOVER_RISE_START = 0.2; // 3. #chips-and-startover y-move, simple ease, @200ms
+const CHIPS_AND_STARTOVER_RISE_DURATION = 0.35;
+const CHIPS_CENTER_DURATION = 0.5; // 4. #username-chips x-center + scale, simple ease, @0s
+const CHIPS_SCALE_UP = 1.3;
+const START_OVER_FADE_START = 0.5; // 5. #start-over-btn fade in, @500ms
+const START_OVER_FADE_DURATION = 0.25;
 
 // --- Errors -------------------------------------------------------------
 
@@ -433,11 +434,15 @@ function showStatus(message) {
 
 // --- Screens ------------------------------------------------------------
 
-gsap.registerPlugin(Flip);
+gsap.registerPlugin(CustomEase);
+// GSAP doesn't parse raw CSS cubic-bezier() strings on its own (confirmed —
+// it silently falls back to a default ease instead of erroring); CustomEase
+// is what actually understands them, via this SVG-path shorthand where the
+// two "C" control points are exactly the bezier's (x1,y1) and (x2,y2).
+CustomEase.create("heroEase", "M0,0 C0.5,0 0.5,1 1,1"); // cubic-bezier(.5,0,.5,1)
 
 const mainEl = document.querySelector("main");
 const heroGroup = document.getElementById("hero-group");
-const matcherForm = document.getElementById("matcher-form");
 const resultsContent = document.getElementById("results-content");
 
 let transitionTimeline = null;
@@ -446,11 +451,12 @@ let transitionTimeline = null;
 // group (#hero-group) that just switches between two visual modes — nothing
 // here is a separate element getting swapped in for another. Toggling
 // "results-mode"/"showing-results" instantly changes layout (chips-and-
-// startover's alignment, main's justify-content); GSAP's Flip plugin
-// captures the before/after and animates the delta smoothly, which is much
-// more robust than the hand-rolled FLIP math this used to do.
+// startover's alignment, main's justify-content); this measures each
+// element's position before and after that instant change and hands GSAP
+// the exact deltas to animate across, on the explicit timeline below.
 function playTransitionToResults() {
   const barRow = document.getElementById("username-bar-row");
+  const chipsAndStartover = document.getElementById("chips-and-startover");
   const startOverBtn = document.getElementById("start-over-btn");
 
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -462,35 +468,27 @@ function playTransitionToResults() {
     return Promise.resolve();
   }
 
-  // Whole group's current (centered) layout, for its own slide-to-top.
-  const heroState = Flip.getState(heroGroup);
+  // "Before" measurements — everything below is captured while still in
+  // input-mode layout (bar visible, chips left-aligned, hero centered).
+  const heroBefore = heroGroup.getBoundingClientRect();
+  const chipsBefore = usernameChipsEl.getBoundingClientRect();
+  const barRowBefore = barRow.getBoundingClientRect();
+  const chipsAndStartoverBefore = chipsAndStartover.getBoundingClientRect();
+  // Top-to-top distance, not just the bar's own height — that ignores the
+  // margin gap between the bar and the chips-and-startover group below it,
+  // which is why moving up by the bar's height alone landed short.
+  const chipsAndStartoverRise = chipsAndStartoverBefore.top - barRowBefore.top;
 
-  // Take the bar out of normal flow FIRST, frozen at its current visual
-  // spot, so the chips' "after" measurement below already reflects their
-  // true final position. (If we instead let the bar's own height shrink
-  // naturally, the chips would reflow gradually as it did — and Flip would
-  // capture an intermediate position, not the true final one, causing a
-  // second jump once the bar finished collapsing.)
-  const barRect = barRow.getBoundingClientRect();
-  const formRect = matcherForm.getBoundingClientRect();
-  gsap.set(barRow, {
-    position: "absolute",
-    top: barRect.top - formRect.top,
-    left: barRect.left - formRect.left,
-    width: barRect.width,
-    // opacity:0 alone doesn't stop it from being clickable — and it's now
-    // sitting right where the chips/Start Over group rises to, so left
-    // interactive it silently eats clicks meant for Start Over underneath it.
-    pointerEvents: "none",
-  });
-
-  // Chips' current (left-aligned) layout, now that the bar is already out
-  // of flow — captured before the alignment class below flips it to centered.
-  const chipsState = Flip.getState(usernameChipsEl);
-
-  // Trigger the actual layout changes; the Flip calls below animate across them.
+  // Trigger the actual layout changes; the tweens below animate across them.
   heroGroup.classList.add("results-mode");
   mainEl.classList.add("showing-results");
+
+  // "After" measurements, taken the instant the classes above land.
+  const heroAfter = heroGroup.getBoundingClientRect();
+  const chipsAfter = usernameChipsEl.getBoundingClientRect();
+
+  const heroDy = heroBefore.top - heroAfter.top;
+  const chipsDx = chipsBefore.left - chipsAfter.left;
 
   return new Promise((resolve) => {
     transitionTimeline = gsap.timeline({
@@ -500,21 +498,39 @@ function playTransitionToResults() {
       },
     });
 
-    transitionTimeline.add(Flip.from(heroState, { duration: HERO_SLIDE_DURATION, ease: HERO_SLIDE_EASE }), 0);
-
-    transitionTimeline.to(barRow, { opacity: 0, duration: BAR_FADE_DURATION, ease: BAR_FADE_EASE }, 0);
-
-    transitionTimeline.add(
-      Flip.from(chipsState, { duration: CHIPS_RISE_DURATION, ease: CHIPS_RISE_EASE }),
-      CHIPS_RISE_DELAY
+    // 1. #hero-group transitions upwards.
+    transitionTimeline.fromTo(
+      heroGroup,
+      { y: heroDy },
+      { y: 0, duration: HERO_SLIDE_DURATION, ease: HERO_SLIDE_EASE },
+      0
     );
-    transitionTimeline.to(
+
+    // 2. #username-bar-row fades out.
+    transitionTimeline.to(barRow, { opacity: 0, duration: BAR_FADE_DURATION }, 0);
+
+    // 3. #chips-and-startover moves up so its top lands on the bar's original top.
+    transitionTimeline.fromTo(
+      chipsAndStartover,
+      { y: 0 },
+      { y: -chipsAndStartoverRise, duration: CHIPS_AND_STARTOVER_RISE_DURATION },
+      CHIPS_AND_STARTOVER_RISE_START
+    );
+
+    // 4. #username-chips centers itself on the x-axis and scales up, from its own center.
+    transitionTimeline.fromTo(
       usernameChipsEl,
-      { scale: CHIPS_SCALE_UP, duration: CHIPS_RISE_DURATION, ease: CHIPS_RISE_EASE },
-      CHIPS_RISE_DELAY
+      { x: chipsDx, scale: 1 },
+      { x: 0, scale: CHIPS_SCALE_UP, duration: CHIPS_CENTER_DURATION, transformOrigin: "50% 50%" },
+      0
     );
 
-    transitionTimeline.to(startOverBtn, { opacity: 1, duration: START_OVER_FADE_DURATION }, CHIPS_RISE_DELAY);
+    // 5. #start-over-btn fades in.
+    transitionTimeline.to(
+      startOverBtn,
+      { opacity: 1, duration: START_OVER_FADE_DURATION },
+      START_OVER_FADE_START
+    );
   });
 }
 
@@ -527,9 +543,10 @@ function showInputScreen() {
   heroGroup.classList.remove("results-mode");
 
   const barRow = document.getElementById("username-bar-row");
+  const chipsAndStartover = document.getElementById("chips-and-startover");
   const startOverBtn = document.getElementById("start-over-btn");
-  gsap.killTweensOf([heroGroup, usernameChipsEl, barRow, startOverBtn]);
-  gsap.set([heroGroup, usernameChipsEl, barRow], { clearProps: "all" });
+  gsap.killTweensOf([heroGroup, usernameChipsEl, chipsAndStartover, barRow, startOverBtn]);
+  gsap.set([heroGroup, usernameChipsEl, chipsAndStartover, barRow], { clearProps: "all" });
   gsap.set(startOverBtn, { opacity: 0 });
 }
 
