@@ -339,33 +339,61 @@ main.showing-results {
 
 /* --- Status / errors ---------------------------------------------------- */
 
-.status {
+/* #results-content needs real height for #status to center within even when
+   errors/results are both still empty (mid-fetch) — flex:1 gives it the
+   remaining space in main, same as it'd end up occupying once results land. */
+#results-content {
+  position: relative;
+  flex: 1 1 auto;
   display: flex;
+  flex-direction: column;
+}
+
+/* This ID selector's own `display: flex` above outranks the browser's
+   default `[hidden] { display: none }` (an ID beats an attribute selector),
+   so without this override #results-content would stay a full flex item —
+   and go on claiming its whole flex-grow share of #main — even while hidden,
+   shoving #hero-group to the top instead of letting it center on its own. */
+#results-content[hidden] {
+  display: none;
+}
+
+/* An absolutely-positioned overlay (not normal flow) so it never pushes the
+   results grid around as it fades in/out — the two simply cross-fade in
+   place instead of the grid jumping once the status box collapses. */
+.status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  justify-content: center;
+  gap: 1rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  opacity: 1;
+  font-size: 1rem;
+  text-align: center;
+  opacity: 0;
   transition: opacity 0.3s ease;
+  /* purely decorative — never intercept clicks on content underneath */
+  pointer-events: none;
 }
 
 .status[hidden] {
   display: none;
 }
 
-.status.status-fade-out {
-  opacity: 0;
+.status.status-visible {
+  opacity: 1;
+}
+
+#status-text {
+  max-width: 26rem;
 }
 
 .status-icon {
   flex-shrink: 0;
-  max-width: 128px;
-  max-height: 128px;
+  width: 56px;
+  height: 56px;
 }
 
 .errors {
@@ -400,6 +428,37 @@ main.showing-results {
   color: var(--text-muted);
   padding: 2rem 0;
   text-align: center;
+}
+
+/* Absolutely positioned against #results-content (same overlay pattern as
+   .status) so it centers in the results area regardless of the (empty)
+   grid's own size. */
+.no-matches {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+
+.no-matches-heading {
+  margin: 0;
+  font-family: "TiemposHeadlineWeb", "Source Serif 4", Georgia, serif;
+  font-weight: 700;
+  font-size: 2.5rem;
+  color: var(--text-muted);
+}
+
+.no-matches-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1.4;
+  max-width: 28rem;
 }
 
 .film-grid {

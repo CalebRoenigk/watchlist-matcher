@@ -370,6 +370,13 @@ function compareByRuntime(a, b) {
   return a.runtimeMinutes - b.runtimeMinutes || a.title.localeCompare(b.title);
 }
 
+const NO_MATCHES_MESSAGES = [
+  { heading: "Hmmm... thats odd.", subtitle: "Looks like these accounts don’t share any movies on their watchlists!" },
+  { heading: "Welp this is awkward.", subtitle: "Looks like these accounts don’t share any movies on their watchlists!" },
+  { heading: "Uh oh.", subtitle: "Looks like these accounts don’t share any movies on their watchlists!" },
+  { heading: "Nothing to see here.", subtitle: "Looks like these accounts don’t share any movies on their watchlists!" },
+];
+
 // All matched films in a single grid: highest share-count first, then
 // shortest-to-longest runtime within the same count.
 function renderResultsGrid(ranked, totalOk, userAvatars) {
@@ -377,10 +384,17 @@ function renderResultsGrid(ranked, totalOk, userAvatars) {
   container.innerHTML = "";
 
   if (ranked.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "No movies are shared by more than one of these watchlists.";
-    container.appendChild(empty);
+    const { heading, subtitle } = NO_MATCHES_MESSAGES[Math.floor(Math.random() * NO_MATCHES_MESSAGES.length)];
+    const wrap = document.createElement("div");
+    wrap.className = "no-matches";
+    const headingEl = document.createElement("p");
+    headingEl.className = "no-matches-heading";
+    headingEl.textContent = heading;
+    const subtitleEl = document.createElement("p");
+    subtitleEl.className = "no-matches-subtitle";
+    subtitleEl.textContent = subtitle;
+    wrap.append(headingEl, subtitleEl);
+    container.appendChild(wrap);
     return;
   }
 
@@ -429,19 +443,25 @@ function showStatus(message) {
   }
 
   if (!message) {
-    statusEl.classList.add("status-fade-out");
+    statusEl.classList.remove("status-visible");
     statusHideTimeout = setTimeout(() => {
       statusEl.hidden = true;
-      statusEl.classList.remove("status-fade-out");
       statusTextEl.textContent = "";
       statusHideTimeout = null;
     }, STATUS_FADE_MS);
     return;
   }
 
-  statusEl.hidden = false;
-  statusEl.classList.remove("status-fade-out");
   statusTextEl.textContent = message;
+
+  if (statusEl.hidden) {
+    statusEl.hidden = false;
+    // Force a reflow so the browser actually paints the opacity:0 starting
+    // state before "status-visible" flips it to 1 — otherwise both style
+    // changes land in the same frame and it just pops in with no fade.
+    statusEl.offsetHeight;
+  }
+  statusEl.classList.add("status-visible");
 }
 
 // --- Screens ------------------------------------------------------------
