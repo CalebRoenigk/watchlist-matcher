@@ -55,7 +55,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "GraphikWeb", "Inter", -apple-system, system-ui, "Segoe UI", "Hiragino Sans", Meiryo, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
@@ -69,7 +69,9 @@ main {
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 0 1.5rem 4rem;
+  /* bottom padding clears the fixed footer's solid (opaque) band so content
+     can scroll fully above it, not just into the fading part of the scrim */
+  padding: 0 1.5rem 8rem;
 }
 
 /* Results can be arbitrarily long (errors, a big film grid), so once they're
@@ -99,7 +101,7 @@ main.showing-results {
 
 .page-header h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", Times, serif;
+  font-family: "TiemposHeadlineWeb", "Source Serif 4", Georgia, serif;
   font-weight: 700;
   font-size: 2.5rem;
 }
@@ -536,14 +538,36 @@ main.showing-results {
 }
 
 .page-footer {
-  flex-shrink: 0;
-  max-width: 1100px;
-  margin: 0 auto;
-  width: 100%;
-  padding: 2rem 1.5rem 3rem;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  padding: 2.5rem 1.5rem 1.75rem;
+  background: var(--bg);
   color: var(--text-muted);
   font-size: 0.8rem;
   text-align: center;
+  /* the gradient above extends well past the visible text, and would
+     otherwise sit on top of the film grid intercepting clicks on it */
+  pointer-events: none;
+}
+
+/* Scrim: solid at the footer's top edge (slightly above the text baseline),
+   fading to fully transparent higher up the page. */
+.page-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 9rem;
+  background: linear-gradient(to top, var(--bg), transparent);
+}
+
+.page-footer p {
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
