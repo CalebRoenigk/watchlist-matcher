@@ -509,7 +509,7 @@ main.showing-results {
   display: block;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--bg-elevated);
+  border: 2px solid var(--bg);
   background: var(--bg-elevated-2);
   margin-left: -8px;
   transition: transform 0.1s ease;
