@@ -503,6 +503,7 @@ main {
   padding: 2rem 1.5rem 3rem;
   color: var(--text-muted);
   font-size: 0.8rem;
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
