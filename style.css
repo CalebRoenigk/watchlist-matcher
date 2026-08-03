@@ -62,6 +62,12 @@ body {
 }
 
 main {
+  /* showInputScreen() in app.js takes #results-content out of flow
+     (position:absolute) using top/left computed relative to main's own box
+     — without main itself being positioned, that absolute box resolves
+     against a further-up ancestor instead, landing short by main's own
+     centering margin and visibly jumping left. */
+  position: relative;
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
