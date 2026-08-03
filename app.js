@@ -17,6 +17,8 @@ const FILM_DETAILS_CONCURRENCY = 5;
 const CARD_STAGGER_MS = 15;
 const CARD_STAGGER_MAX_MS = 300;
 const STATUS_FADE_MS = 300;
+const CHIP_FADE_MS = 180;
+const CHIP_SLIDE_MS = 200;
 
 // --- Errors -------------------------------------------------------------
 
@@ -448,17 +450,14 @@ function hasUsername(name) {
   return enteredUsernames.some((u) => u.toLowerCase() === key);
 }
 
+// Appends just the one new chip (rather than re-rendering the whole list)
+// so its CSS entrance animation plays once, without replaying on chips
+// that already exist.
 function addUsername(rawName) {
   const name = rawName.trim();
   if (!name || hasUsername(name)) return;
   enteredUsernames.push(name);
-  renderUsernameChips();
-  updateSubmitState();
-}
-
-function removeUsername(name) {
-  enteredUsernames = enteredUsernames.filter((u) => u !== name);
-  renderUsernameChips();
+  usernameChipsEl.appendChild(createUsernameChip(name, true));
   updateSubmitState();
 }
 
@@ -476,18 +475,53 @@ function createUsernameChip(name, removable) {
     removeBtn.className = "chip-remove";
     removeBtn.textContent = "×";
     removeBtn.setAttribute("aria-label", `Remove @${name}`);
-    removeBtn.addEventListener("click", () => removeUsername(name));
+    removeBtn.addEventListener("click", () => {
+      enteredUsernames = enteredUsernames.filter((u) => u !== name);
+      updateSubmitState();
+      removeChipWithAnimation(chip, usernameChipsEl);
+    });
     chip.appendChild(removeBtn);
   }
 
   return chip;
 }
 
-function renderUsernameChips() {
-  usernameChipsEl.innerHTML = "";
-  for (const name of enteredUsernames) {
-    usernameChipsEl.appendChild(createUsernameChip(name, true));
+// Fades the removed chip out in place first (its neighbors don't move yet —
+// the space is still reserved), then removes it and animates the remaining
+// chips sliding left/up to fill the gap (the FLIP technique: capture
+// positions before the DOM change, apply them as an inverted transform right
+// after, then transition that transform back to zero).
+function removeChipWithAnimation(chip, container) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    chip.remove();
+    return;
   }
+
+  chip.classList.add("chip-removing");
+
+  setTimeout(() => {
+    const siblings = [...container.querySelectorAll(".username-chip")].filter((el) => el !== chip);
+    const firstRects = new Map(siblings.map((el) => [el, el.getBoundingClientRect()]));
+
+    chip.remove();
+
+    for (const el of siblings) {
+      const first = firstRects.get(el);
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (!dx && !dy) continue;
+
+      // Web Animations API instead of a manual transition: it takes explicit
+      // from/to keyframes directly, so there's no dependency on the browser
+      // having painted an intermediate style before the "real" transition
+      // starts (which plain CSS transitions need, and is easy to race).
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], {
+        duration: CHIP_SLIDE_MS,
+        easing: "ease",
+      });
+    }
+  }, CHIP_FADE_MS);
 }
 
 function renderResultsChips(usernames) {
@@ -592,7 +626,7 @@ startOverBtn.addEventListener("click", () => {
   currentRunId++; // invalidate any in-flight fetch from the previous run
 
   enteredUsernames = [];
-  renderUsernameChips();
+  usernameChipsEl.innerHTML = "";
   updateSubmitState();
   usernameInput.value = "";
 
