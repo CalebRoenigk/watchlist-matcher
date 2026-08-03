@@ -470,7 +470,7 @@ main.showing-results {
 @keyframes film-card-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(var(--film-card-rise));
   }
   to {
     opacity: 1;
@@ -479,10 +479,14 @@ main.showing-results {
 }
 
 .film-card {
+  /* Tune the entrance animation here: how far it rises, how long it takes.
+     The delay between each card is CARD_STAGGER_MS in app.js. */
+  --film-card-rise: 32px;
+  --film-card-duration: 0.4s;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  animation: film-card-in 0.35s ease both;
+  animation: film-card-in var(--film-card-duration) ease-out both;
 }
 
 .film-poster-wrap {
