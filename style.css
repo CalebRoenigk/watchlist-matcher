@@ -244,6 +244,11 @@ main.showing-results {
 #start-over-btn {
   opacity: 0;
   pointer-events: none;
+  /* Independent of .chips-and-startover's align-items (which differs between
+     input mode and results mode, for the chips) — this button stays centered
+     always, so it never visibly jumps to the left during the reverse
+     transition when results-mode is removed partway through its fade-out. */
+  align-self: center;
 }
 
 #hero-group.results-mode #start-over-btn {

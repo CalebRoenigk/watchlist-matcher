@@ -43,6 +43,7 @@ const CHIPS_AND_STARTOVER_RETURN_DURATION = 0.35; // 3. move back down, @0s
 const CHIPS_SCALE_RETURN_DURATION = 0.35; // 4. scale back to 1, @0s
 const CHIPS_UNCENTER_DURATION = 0.5; // 5. return to left-aligned x, @0s
 const START_OVER_FADE_OUT_DURATION = 0.25; // 6. #start-over-btn fade out, @0s
+const CHIPS_FADE_OUT_DURATION = 0.3; // 7. #username-chips fade out, @0s
 
 // --- Errors -------------------------------------------------------------
 
@@ -648,6 +649,9 @@ function showInputScreen() {
 
     // 6. #start-over-btn fades out.
     transitionTimeline.to(startOverBtn, { opacity: 0, duration: START_OVER_FADE_OUT_DURATION }, 0);
+
+    // 7. #username-chips fades out.
+    transitionTimeline.fromTo(usernameChipsEl, { opacity: 1 }, { opacity: 0, duration: CHIPS_FADE_OUT_DURATION }, 0);
   });
 }
 
