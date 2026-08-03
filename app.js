@@ -277,18 +277,24 @@ function makeAvatarFallback(username) {
 }
 
 function renderAvatar(username, avatarUrl) {
+  // Wrapper (not the link itself) owns the stacking overlap + tooltip
+  // positioning — the link needs its own overflow:hidden to clip the avatar
+  // image into a circle, which would also clip the tooltip if it lived there.
+  const wrap = document.createElement("span");
+  wrap.className = "film-avatar-item";
+
   const link = document.createElement("a");
   link.className = "film-avatar-link";
   link.href = `https://letterboxd.com/${encodeURIComponent(username)}/`;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
-  link.title = `@${username}`;
+  link.setAttribute("aria-label", `@${username}`);
 
   if (avatarUrl) {
     const img = document.createElement("img");
     img.className = "film-avatar";
     img.src = avatarUrl;
-    img.alt = `@${username}`;
+    img.alt = "";
     img.loading = "lazy";
     img.addEventListener("error", () => img.replaceWith(makeAvatarFallback(username)), { once: true });
     link.appendChild(img);
@@ -296,7 +302,12 @@ function renderAvatar(username, avatarUrl) {
     link.appendChild(makeAvatarFallback(username));
   }
 
-  return link;
+  const tooltip = document.createElement("span");
+  tooltip.className = "avatar-tooltip";
+  tooltip.textContent = `@${username}`;
+
+  wrap.append(link, tooltip);
+  return wrap;
 }
 
 function renderAvatarStack(usernames, userAvatars) {

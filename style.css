@@ -563,25 +563,69 @@ main.showing-results {
   margin-top: 0.1rem;
 }
 
-.film-avatar-link {
-  width: 22px;
-  height: 22px;
+/* Owns the stacking overlap + is the tooltip's positioning root — the link
+   itself needs its own overflow:hidden to clip the avatar into a circle,
+   which would also clip the tooltip if the tooltip lived inside it instead. */
+.film-avatar-item {
+  position: relative;
   flex-shrink: 0;
-  display: block;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid var(--bg);
-  background: var(--bg-elevated-2);
   margin-left: -8px;
-  transition: transform 0.1s ease;
 }
 
 .film-avatars > :first-child {
   margin-left: 0;
 }
 
+.film-avatar-link {
+  width: 22px;
+  height: 22px;
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--bg);
+  background: var(--bg-elevated-2);
+  transition: transform 0.1s ease;
+}
+
 .film-avatar-link:hover {
   transform: translateY(-2px);
+}
+
+.avatar-tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+
+/* Arrow at the tooltip's top-center, pointing up at the avatar — the
+   classic transparent-sides / colored-bottom-border triangle trick. */
+.avatar-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: var(--bg-elevated-2);
+}
+
+.film-avatar-item:hover .avatar-tooltip,
+.film-avatar-item:focus-within .avatar-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .film-avatar {
@@ -644,5 +688,8 @@ main.showing-results {
   }
   .username-chip {
     animation: none;
+  }
+  .avatar-tooltip {
+    transition: none;
   }
 }
