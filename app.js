@@ -19,6 +19,8 @@ const CARD_STAGGER_MAX_MS = 300;
 const STATUS_FADE_MS = 300;
 const CHIP_FADE_MS = 180;
 const CHIP_SLIDE_MS = 200;
+const SCREEN_TRANSITION_MS = 280;
+const TRANSITION_EASING = "cubic-bezier(0.16, 1, 0.3, 1)"; // snappy: fast start, smooth settle
 
 // --- Errors -------------------------------------------------------------
 
@@ -421,17 +423,94 @@ function showStatus(message) {
 
 // --- Screens ------------------------------------------------------------
 
+const mainEl = document.querySelector("main");
+const heroGroup = document.getElementById("hero-group");
 const inputScreen = document.getElementById("input-screen");
 const resultsScreen = document.getElementById("results-screen");
+
+let heroSlideAnimation = null;
+let chipsRiseAnimation = null;
+
+// Fades out the input bar, grows and raises the chips to roughly where the
+// input bar was, and FLIP-slides the whole header+input group up to the top
+// (mirroring the layout shift from centered to top-aligned) — then swaps to
+// the results screen once that's finished.
+function playTransitionToResults() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    showResultsScreen();
+    return Promise.resolve();
+  }
+
+  const barRow = document.querySelector(".username-bar-row");
+
+  const heroFirst = heroGroup.getBoundingClientRect();
+  const barRect = barRow.getBoundingClientRect();
+  const chipsFirst = usernameChipsEl.getBoundingClientRect();
+
+  barRow.classList.add("fading-out");
+
+  const chipsDy = barRect.top - chipsFirst.top;
+
+  // The chips container itself is a fixed 700px-wide centered box (so its
+  // left edge lines up with the input's placeholder text), but the chip
+  // *content* inside it is left-aligned within that box, not centered — while
+  // the results screen's chips size to their content and end up truly
+  // centered. Without correcting for that, the content visibly jumps
+  // sideways the instant the screens swap. Measure the actual chip content's
+  // bounds (not the container box) and shift it toward true center too.
+  const chipEls = [...usernameChipsEl.children];
+  const chipRects = chipEls.map((el) => el.getBoundingClientRect());
+  const contentLeft = Math.min(...chipRects.map((r) => r.left));
+  const contentRight = Math.max(...chipRects.map((r) => r.right));
+  const contentCenterX = (contentLeft + contentRight) / 2;
+  const chipsDx = window.innerWidth / 2 - contentCenterX;
+
+  // Ends back at scale(1) — the freshly-rendered results-screen chips render
+  // at scale(1), so landing anywhere else here would cause a visible snap
+  // the instant the screens swap. The growth is just a mid-flight bounce.
+  chipsRiseAnimation = usernameChipsEl.animate(
+    [
+      { transform: "translate(0, 0) scale(1)" },
+      { transform: `translate(${chipsDx * 0.6}px, ${chipsDy * 0.6}px) scale(1.08)`, offset: 0.6 },
+      { transform: `translate(${chipsDx}px, ${chipsDy}px) scale(1)` },
+    ],
+    { duration: SCREEN_TRANSITION_MS, easing: TRANSITION_EASING, fill: "forwards" }
+  );
+
+  mainEl.classList.add("showing-results");
+
+  const heroLast = heroGroup.getBoundingClientRect();
+  const heroDy = heroFirst.top - heroLast.top;
+  if (heroDy) {
+    heroSlideAnimation = heroGroup.animate(
+      [{ transform: `translateY(${heroDy}px)` }, { transform: "translateY(0)" }],
+      { duration: SCREEN_TRANSITION_MS, easing: TRANSITION_EASING }
+    );
+  }
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      showResultsScreen();
+      resolve();
+    }, SCREEN_TRANSITION_MS);
+  });
+}
 
 function showInputScreen() {
   resultsScreen.hidden = true;
   inputScreen.hidden = false;
+  mainEl.classList.remove("showing-results");
+
+  // undo the transition's visual state so a fresh search starts clean
+  document.querySelector(".username-bar-row").classList.remove("fading-out");
+  chipsRiseAnimation?.cancel();
+  heroSlideAnimation?.cancel();
 }
 
 function showResultsScreen() {
   inputScreen.hidden = true;
   resultsScreen.hidden = false;
+  mainEl.classList.add("showing-results");
 }
 
 // --- Username chip input --------------------------------------------------
@@ -463,7 +542,7 @@ function addUsername(rawName) {
 
 function createUsernameChip(name, removable) {
   const chip = document.createElement("span");
-  chip.className = "username-chip";
+  chip.className = removable ? "username-chip chip-enter" : "username-chip";
 
   const label = document.createElement("span");
   label.textContent = `@${name}`;
@@ -576,7 +655,8 @@ form.addEventListener("submit", async (event) => {
   const usernames = enteredUsernames.slice();
   const runId = ++currentRunId;
 
-  showResultsScreen();
+  submitBtn.disabled = true; // guard against double-submit while the transition is still playing
+  playTransitionToResults();
   renderResultsChips(usernames);
   document.getElementById("results").innerHTML = "";
   renderErrorSummary([]);

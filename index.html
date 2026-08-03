@@ -6,42 +6,45 @@
   <meta name="color-scheme" content="dark" />
   <title>Letterboxd Watchlist Matcher</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
-  <header class="page-header">
-    <div class="title-row">
-      <img src="assets/favicon.svg" alt="" class="title-icon" width="40" height="40" />
-      <h1>Watchlist Matcher</h1>
-    </div>
-    <p class="subtitle">
-      Enter multiple Letterboxd usernames to find shared movies across their watchlists.
-    </p>
-  </header>
-
   <main>
-    <section id="input-screen">
-      <form id="matcher-form">
-        <div class="username-bar-row">
-          <input
-            type="text"
-            id="username-input"
-            class="username-bar"
-            placeholder="Enter Letterboxd usernames separated by a space"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
+    <div id="hero-group">
+      <header class="page-header">
+        <div class="title-row">
+          <img src="assets/favicon.svg" alt="" class="title-icon" width="40" height="40" />
+          <h1>Watchlist Matcher</h1>
         </div>
+        <p class="subtitle">
+          Enter multiple Letterboxd usernames to find shared movies across their watchlists.
+        </p>
+      </header>
 
-        <div id="username-chips" class="username-chips"></div>
-      </form>
-    </section>
+      <section id="input-screen">
+        <form id="matcher-form">
+          <div class="username-bar-row">
+            <input
+              type="text"
+              id="username-input"
+              class="username-bar"
+              placeholder="Enter Letterboxd usernames separated by a space"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
+          </div>
+
+          <div id="username-chips" class="username-chips"></div>
+        </form>
+      </section>
+    </div>
 
     <section id="results-screen" hidden>
-      <div id="results-chips" class="username-chips"></div>
-
-      <button type="button" id="start-over-btn" class="btn btn-accent">Start over</button>
+      <div class="results-header">
+        <div id="results-chips" class="username-chips"></div>
+        <button type="button" id="start-over-btn" class="btn btn-accent">Start over</button>
+      </div>
 
       <section id="status" class="status" hidden aria-live="polite">
         <img src="assets/loading-icon.svg" alt="" class="status-icon" width="24" height="24" />
@@ -61,6 +64,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=7" defer></script>
+  <script src="app.js?v=13" defer></script>
 </body>
 </html>

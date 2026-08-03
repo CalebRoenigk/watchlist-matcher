@@ -63,10 +63,19 @@ body {
 
 main {
   flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 1.5rem 4rem;
+}
+
+/* Results can be arbitrarily long (errors, a big film grid), so once they're
+   showing the whole group anchors to the top instead of staying centered. */
+main.showing-results {
+  justify-content: flex-start;
 }
 
 .page-header {
@@ -107,6 +116,12 @@ main {
   gap: 0.75rem;
   max-width: 700px;
   margin: 1.5rem auto 0;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.username-bar-row.fading-out {
+  opacity: 0;
 }
 
 .username-bar {
@@ -147,9 +162,16 @@ main {
   padding-left: 1.5rem;
 }
 
+.results-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 #results-screen .username-chips {
-  margin: 0 0 1.25rem;
-  max-width: none;
+  margin: 0;
   padding-left: 0;
 }
 
@@ -182,6 +204,12 @@ main {
   border-radius: var(--radius-sm);
   padding: 0.4rem 0.75rem;
   font-size: 0.85rem;
+}
+
+/* Only the input screen's own chips (added live as you type) get the
+   entrance animation — the results screen's read-only chips are rendered
+   fresh each time the screen shows, and shouldn't replay it. */
+.username-chip.chip-enter {
   animation: chip-in 0.25s ease-out both;
 }
 
@@ -267,7 +295,6 @@ main {
 .btn-accent {
   background: var(--btn-accent-surface);
   color: var(--btn-accent-text);
-  margin-bottom: 1.5rem;
 }
 
 .btn-accent:hover:not(:disabled) {
