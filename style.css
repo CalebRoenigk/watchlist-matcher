@@ -492,7 +492,36 @@ main.showing-results {
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+}
+
+/* A ::after overlay rather than a box-shadow on .film-poster-wrap itself —
+   box-shadow paints behind child content, so it'd be completely hidden under
+   the (edge-to-edge) poster image. This paints after/on top of the image,
+   as a purely decorative ring that can thicken on hover without affecting
+   the box's size (unlike a real border, which would eat into the image's
+   content area with box-sizing:border-box, squeezing the poster). */
+.film-poster-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: box-shadow 0.2s ease;
+  pointer-events: none;
+}
+
+.film-poster-wrap:hover::after {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+.film-poster-wrap img,
+.film-poster-wrap .film-poster-fallback {
+  transition: transform 0.2s ease;
+}
+
+.film-poster-wrap:hover img,
+.film-poster-wrap:hover .film-poster-fallback {
+  transform: scale(1.06);
 }
 
 .film-poster-wrap img {
