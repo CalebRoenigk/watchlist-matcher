@@ -19,8 +19,18 @@ const CARD_STAGGER_MAX_MS = 300;
 const STATUS_FADE_MS = 300;
 const CHIP_FADE_MS = 180;
 const CHIP_SLIDE_MS = 200;
-const SCREEN_TRANSITION_MS = 280;
-const TRANSITION_EASING = "cubic-bezier(0.16, 1, 0.3, 1)"; // snappy: fast start, smooth settle
+
+// Input-screen -> results-screen transition (GSAP; durations in seconds to
+// match GSAP's own convention, tune freely).
+const HERO_SLIDE_DURATION = 0.65;
+const HERO_SLIDE_EASE = "power3.out";
+const BAR_FADE_DURATION = 0.4;
+const BAR_FADE_EASE = "power2.in";
+const CHIPS_RISE_DELAY = 0.2; // chips start shifting slightly after the bar begins fading
+const CHIPS_RISE_DURATION = 0.6;
+const CHIPS_RISE_EASE = "power3.out";
+const CHIPS_SCALE_UP = 1.08;
+const START_OVER_FADE_DURATION = 0.55;
 
 // --- Errors -------------------------------------------------------------
 
@@ -423,101 +433,110 @@ function showStatus(message) {
 
 // --- Screens ------------------------------------------------------------
 
+gsap.registerPlugin(Flip);
+
 const mainEl = document.querySelector("main");
 const heroGroup = document.getElementById("hero-group");
-const inputScreen = document.getElementById("input-screen");
-const resultsScreen = document.getElementById("results-screen");
+const matcherForm = document.getElementById("matcher-form");
+const resultsContent = document.getElementById("results-content");
 
-let heroSlideAnimation = null;
-let chipsRiseAnimation = null;
+let transitionTimeline = null;
 
-// Fades out the input bar, grows and raises the chips to roughly where the
-// input bar was, and FLIP-slides the whole header+input group up to the top
-// (mirroring the layout shift from centered to top-aligned) — then swaps to
-// the results screen once that's finished.
+// The header, input bar, chips, and Start Over button are one persistent
+// group (#hero-group) that just switches between two visual modes — nothing
+// here is a separate element getting swapped in for another. Toggling
+// "results-mode"/"showing-results" instantly changes layout (chips-and-
+// startover's alignment, main's justify-content); GSAP's Flip plugin
+// captures the before/after and animates the delta smoothly, which is much
+// more robust than the hand-rolled FLIP math this used to do.
 function playTransitionToResults() {
+  const barRow = document.getElementById("username-bar-row");
+  const startOverBtn = document.getElementById("start-over-btn");
+
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    showResultsScreen();
+    heroGroup.classList.add("results-mode");
+    mainEl.classList.add("showing-results");
+    gsap.set(barRow, { opacity: 0 });
+    gsap.set(startOverBtn, { opacity: 1 });
+    resultsContent.hidden = false;
     return Promise.resolve();
   }
 
-  const barRow = document.querySelector(".username-bar-row");
+  // Whole group's current (centered) layout, for its own slide-to-top.
+  const heroState = Flip.getState(heroGroup);
 
-  const heroFirst = heroGroup.getBoundingClientRect();
+  // Take the bar out of normal flow FIRST, frozen at its current visual
+  // spot, so the chips' "after" measurement below already reflects their
+  // true final position. (If we instead let the bar's own height shrink
+  // naturally, the chips would reflow gradually as it did — and Flip would
+  // capture an intermediate position, not the true final one, causing a
+  // second jump once the bar finished collapsing.)
   const barRect = barRow.getBoundingClientRect();
-  const chipsFirst = usernameChipsEl.getBoundingClientRect();
+  const formRect = matcherForm.getBoundingClientRect();
+  gsap.set(barRow, {
+    position: "absolute",
+    top: barRect.top - formRect.top,
+    left: barRect.left - formRect.left,
+    width: barRect.width,
+    // opacity:0 alone doesn't stop it from being clickable — and it's now
+    // sitting right where the chips/Start Over group rises to, so left
+    // interactive it silently eats clicks meant for Start Over underneath it.
+    pointerEvents: "none",
+  });
 
-  barRow.classList.add("fading-out");
+  // Chips' current (left-aligned) layout, now that the bar is already out
+  // of flow — captured before the alignment class below flips it to centered.
+  const chipsState = Flip.getState(usernameChipsEl);
 
-  const chipsDy = barRect.top - chipsFirst.top;
-
-  // The chips container itself is a fixed 700px-wide centered box (so its
-  // left edge lines up with the input's placeholder text), but the chip
-  // *content* inside it is left-aligned within that box, not centered — while
-  // the results screen's chips size to their content and end up truly
-  // centered. Without correcting for that, the content visibly jumps
-  // sideways the instant the screens swap. Measure the actual chip content's
-  // bounds (not the container box) and shift it toward true center too.
-  const chipEls = [...usernameChipsEl.children];
-  const chipRects = chipEls.map((el) => el.getBoundingClientRect());
-  const contentLeft = Math.min(...chipRects.map((r) => r.left));
-  const contentRight = Math.max(...chipRects.map((r) => r.right));
-  const contentCenterX = (contentLeft + contentRight) / 2;
-  const chipsDx = window.innerWidth / 2 - contentCenterX;
-
-  // Ends back at scale(1) — the freshly-rendered results-screen chips render
-  // at scale(1), so landing anywhere else here would cause a visible snap
-  // the instant the screens swap. The growth is just a mid-flight bounce.
-  chipsRiseAnimation = usernameChipsEl.animate(
-    [
-      { transform: "translate(0, 0) scale(1)" },
-      { transform: `translate(${chipsDx * 0.6}px, ${chipsDy * 0.6}px) scale(1.08)`, offset: 0.6 },
-      { transform: `translate(${chipsDx}px, ${chipsDy}px) scale(1)` },
-    ],
-    { duration: SCREEN_TRANSITION_MS, easing: TRANSITION_EASING, fill: "forwards" }
-  );
-
+  // Trigger the actual layout changes; the Flip calls below animate across them.
+  heroGroup.classList.add("results-mode");
   mainEl.classList.add("showing-results");
 
-  const heroLast = heroGroup.getBoundingClientRect();
-  const heroDy = heroFirst.top - heroLast.top;
-  if (heroDy) {
-    heroSlideAnimation = heroGroup.animate(
-      [{ transform: `translateY(${heroDy}px)` }, { transform: "translateY(0)" }],
-      { duration: SCREEN_TRANSITION_MS, easing: TRANSITION_EASING }
-    );
-  }
-
   return new Promise((resolve) => {
-    setTimeout(() => {
-      showResultsScreen();
-      resolve();
-    }, SCREEN_TRANSITION_MS);
+    transitionTimeline = gsap.timeline({
+      onComplete: () => {
+        resultsContent.hidden = false;
+        resolve();
+      },
+    });
+
+    transitionTimeline.add(Flip.from(heroState, { duration: HERO_SLIDE_DURATION, ease: HERO_SLIDE_EASE }), 0);
+
+    transitionTimeline.to(barRow, { opacity: 0, duration: BAR_FADE_DURATION, ease: BAR_FADE_EASE }, 0);
+
+    transitionTimeline.add(
+      Flip.from(chipsState, { duration: CHIPS_RISE_DURATION, ease: CHIPS_RISE_EASE }),
+      CHIPS_RISE_DELAY
+    );
+    transitionTimeline.to(
+      usernameChipsEl,
+      { scale: CHIPS_SCALE_UP, duration: CHIPS_RISE_DURATION, ease: CHIPS_RISE_EASE },
+      CHIPS_RISE_DELAY
+    );
+
+    transitionTimeline.to(startOverBtn, { opacity: 1, duration: START_OVER_FADE_DURATION }, CHIPS_RISE_DELAY);
   });
 }
 
 function showInputScreen() {
-  resultsScreen.hidden = true;
-  inputScreen.hidden = false;
+  transitionTimeline?.kill();
+  transitionTimeline = null;
+
+  resultsContent.hidden = true;
   mainEl.classList.remove("showing-results");
+  heroGroup.classList.remove("results-mode");
 
-  // undo the transition's visual state so a fresh search starts clean
-  document.querySelector(".username-bar-row").classList.remove("fading-out");
-  chipsRiseAnimation?.cancel();
-  heroSlideAnimation?.cancel();
-}
-
-function showResultsScreen() {
-  inputScreen.hidden = true;
-  resultsScreen.hidden = false;
-  mainEl.classList.add("showing-results");
+  const barRow = document.getElementById("username-bar-row");
+  const startOverBtn = document.getElementById("start-over-btn");
+  gsap.killTweensOf([heroGroup, usernameChipsEl, barRow, startOverBtn]);
+  gsap.set([heroGroup, usernameChipsEl, barRow], { clearProps: "all" });
+  gsap.set(startOverBtn, { opacity: 0 });
 }
 
 // --- Username chip input --------------------------------------------------
 
 const usernameInput = document.getElementById("username-input");
 const usernameChipsEl = document.getElementById("username-chips");
-const resultsChipsEl = document.getElementById("results-chips");
 const submitBtn = document.getElementById("submit-btn");
 const form = document.getElementById("matcher-form");
 const startOverBtn = document.getElementById("start-over-btn");
@@ -536,31 +555,33 @@ function addUsername(rawName) {
   const name = rawName.trim();
   if (!name || hasUsername(name)) return;
   enteredUsernames.push(name);
-  usernameChipsEl.appendChild(createUsernameChip(name, true));
+  usernameChipsEl.appendChild(createUsernameChip(name));
   updateSubmitState();
 }
 
-function createUsernameChip(name, removable) {
+// Chips are always the same persistent set (input-editable and
+// results-readonly are now just two visual modes of #hero-group, not
+// separate elements) — the remove button is always present, and CSS just
+// hides it once #hero-group is in results-mode.
+function createUsernameChip(name) {
   const chip = document.createElement("span");
-  chip.className = removable ? "username-chip chip-enter" : "username-chip";
+  chip.className = "username-chip chip-enter";
 
   const label = document.createElement("span");
   label.textContent = `@${name}`;
   chip.appendChild(label);
 
-  if (removable) {
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "chip-remove";
-    removeBtn.textContent = "×";
-    removeBtn.setAttribute("aria-label", `Remove @${name}`);
-    removeBtn.addEventListener("click", () => {
-      enteredUsernames = enteredUsernames.filter((u) => u !== name);
-      updateSubmitState();
-      removeChipWithAnimation(chip, usernameChipsEl);
-    });
-    chip.appendChild(removeBtn);
-  }
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "chip-remove";
+  removeBtn.textContent = "×";
+  removeBtn.setAttribute("aria-label", `Remove @${name}`);
+  removeBtn.addEventListener("click", () => {
+    enteredUsernames = enteredUsernames.filter((u) => u !== name);
+    updateSubmitState();
+    removeChipWithAnimation(chip, usernameChipsEl);
+  });
+  chip.appendChild(removeBtn);
 
   return chip;
 }
@@ -601,13 +622,6 @@ function removeChipWithAnimation(chip, container) {
       });
     }
   }, CHIP_FADE_MS);
-}
-
-function renderResultsChips(usernames) {
-  resultsChipsEl.innerHTML = "";
-  for (const name of usernames) {
-    resultsChipsEl.appendChild(createUsernameChip(name, false));
-  }
 }
 
 function updateSubmitState() {
@@ -657,7 +671,6 @@ form.addEventListener("submit", async (event) => {
 
   submitBtn.disabled = true; // guard against double-submit while the transition is still playing
   playTransitionToResults();
-  renderResultsChips(usernames);
   document.getElementById("results").innerHTML = "";
   renderErrorSummary([]);
   showStatus("Fetching watchlists…");

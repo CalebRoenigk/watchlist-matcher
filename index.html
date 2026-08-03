@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark" />
   <title>Letterboxd Watchlist Matcher</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-  <link rel="stylesheet" href="style.css?v=13" />
+  <link rel="stylesheet" href="style.css?v=17" />
 </head>
 <body>
   <main>
@@ -21,31 +21,27 @@
         </p>
       </header>
 
-      <section id="input-screen">
-        <form id="matcher-form">
-          <div class="username-bar-row">
-            <input
-              type="text"
-              id="username-input"
-              class="username-bar"
-              placeholder="Enter Letterboxd usernames separated by a space"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
-          </div>
+      <form id="matcher-form">
+        <div class="username-bar-row" id="username-bar-row">
+          <input
+            type="text"
+            id="username-input"
+            class="username-bar"
+            placeholder="Enter Letterboxd usernames separated by a space"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
+        </div>
 
+        <div class="chips-and-startover" id="chips-and-startover">
           <div id="username-chips" class="username-chips"></div>
-        </form>
-      </section>
+          <button type="button" id="start-over-btn" class="btn btn-accent">Start over</button>
+        </div>
+      </form>
     </div>
 
-    <section id="results-screen" hidden>
-      <div class="results-header">
-        <div id="results-chips" class="username-chips"></div>
-        <button type="button" id="start-over-btn" class="btn btn-accent">Start over</button>
-      </div>
-
+    <section id="results-content" hidden>
       <section id="status" class="status" hidden aria-live="polite">
         <img src="assets/loading-icon.svg" alt="" class="status-icon" width="24" height="24" />
         <span id="status-text"></span>
@@ -64,6 +60,8 @@
     </p>
   </footer>
 
-  <script src="app.js?v=13" defer></script>
+  <script src="assets/vendor/gsap.min.js" defer></script>
+  <script src="assets/vendor/Flip.min.js" defer></script>
+  <script src="app.js?v=17" defer></script>
 </body>
 </html>
