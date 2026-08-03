@@ -33,6 +33,17 @@ const CHIPS_SCALE_UP = 1.3;
 const START_OVER_FADE_START = 0.5; // 5. #start-over-btn fade in, @500ms
 const START_OVER_FADE_DURATION = 0.25;
 
+// Results-screen -> input-screen reverse transition (Start Over). Reuses
+// HERO_SLIDE_DURATION/HERO_SLIDE_EASE for #hero-group's own return (same
+// 700ms/heroEase in both directions).
+const RESULTS_FADE_OUT_DURATION = 0.4; // movie content fades out first, @0s
+const BAR_FADE_IN_START = 0.25; // 2. #username-bar-row fade in, @250ms
+const BAR_FADE_IN_DURATION = 0.45;
+const CHIPS_AND_STARTOVER_RETURN_DURATION = 0.35; // 3. move back down, @0s
+const CHIPS_SCALE_RETURN_DURATION = 0.35; // 4. scale back to 1, @0s
+const CHIPS_UNCENTER_DURATION = 0.5; // 5. return to left-aligned x, @0s
+const START_OVER_FADE_OUT_DURATION = 0.25; // 6. #start-over-btn fade out, @0s
+
 // --- Errors -------------------------------------------------------------
 
 class UserNotFoundError extends Error {
@@ -534,20 +545,110 @@ function playTransitionToResults() {
   });
 }
 
+// Plays the reverse of playTransitionToResults(): the film grid/status area
+// fades out first, then the header group animates back down to centered
+// while the input bar fades back in and the chips/Start Over group returns
+// to its left-aligned, unscaled, un-risen resting state.
 function showInputScreen() {
   transitionTimeline?.kill();
   transitionTimeline = null;
 
-  resultsContent.hidden = true;
-  mainEl.classList.remove("showing-results");
-  heroGroup.classList.remove("results-mode");
+  // enteredUsernames/chips aren't cleared until this transition finishes
+  // (see the Start Over click handler), so without this the submit button
+  // would still read as enabled — and clickable — for the whole ~700ms
+  // reverse animation, racing with it if clicked. updateSubmitState() (via
+  // the click handler, once this resolves) sets the real disabled state.
+  submitBtn.disabled = true;
 
   const barRow = document.getElementById("username-bar-row");
   const chipsAndStartover = document.getElementById("chips-and-startover");
   const startOverBtn = document.getElementById("start-over-btn");
-  gsap.killTweensOf([heroGroup, usernameChipsEl, chipsAndStartover, barRow, startOverBtn]);
-  gsap.set([heroGroup, usernameChipsEl, chipsAndStartover, barRow], { clearProps: "all" });
-  gsap.set(startOverBtn, { opacity: 0 });
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    resultsContent.hidden = true;
+    mainEl.classList.remove("showing-results");
+    heroGroup.classList.remove("results-mode");
+    gsap.killTweensOf([heroGroup, usernameChipsEl, chipsAndStartover, barRow, startOverBtn, resultsContent]);
+    gsap.set([heroGroup, usernameChipsEl, chipsAndStartover, barRow, resultsContent], { clearProps: "all" });
+    gsap.set(startOverBtn, { opacity: 0 });
+    return Promise.resolve();
+  }
+
+  // Take the results area out of flow, frozen at its current visual spot, so
+  // it can fade out without affecting #hero-group's re-centering below (that
+  // needs to compute its centered position as if the results grid wasn't
+  // contributing to main's layout at all).
+  const resultsRect = resultsContent.getBoundingClientRect();
+  const mainRect = mainEl.getBoundingClientRect();
+  gsap.set(resultsContent, {
+    position: "absolute",
+    top: resultsRect.top - mainRect.top,
+    left: resultsRect.left - mainRect.left,
+    width: resultsRect.width,
+    pointerEvents: "none",
+  });
+
+  // "Before" measurements (still in results-mode layout).
+  const heroBefore = heroGroup.getBoundingClientRect();
+  const chipsBefore = usernameChipsEl.getBoundingClientRect(); // reflects current centered position + scale(1.3)
+
+  // Temporarily clear the chips' transform so the "after" measurement below
+  // reflects their true natural (unscaled) left-aligned position, not a
+  // scaled/offset rendering left over from the forward transition.
+  gsap.set(usernameChipsEl, { clearProps: "transform" });
+
+  // Trigger the actual layout changes; the tweens below animate across them.
+  heroGroup.classList.remove("results-mode");
+  mainEl.classList.remove("showing-results");
+
+  // "After" measurements, taken the instant the classes above land.
+  const heroAfter = heroGroup.getBoundingClientRect();
+  const chipsAfter = usernameChipsEl.getBoundingClientRect();
+
+  const heroDy = heroBefore.top - heroAfter.top;
+  const chipsDx = chipsBefore.left - chipsAfter.left;
+
+  return new Promise((resolve) => {
+    transitionTimeline = gsap.timeline({
+      onComplete: () => {
+        resultsContent.hidden = true;
+        gsap.set([heroGroup, usernameChipsEl, chipsAndStartover, barRow, resultsContent], { clearProps: "all" });
+        gsap.set(startOverBtn, { opacity: 0 });
+        resolve();
+      },
+    });
+
+    // The movie content starts fading out first.
+    transitionTimeline.to(resultsContent, { opacity: 0, duration: RESULTS_FADE_OUT_DURATION }, 0);
+
+    // 1. #hero-group transitions back to its starting position.
+    transitionTimeline.fromTo(
+      heroGroup,
+      { y: heroDy },
+      { y: 0, duration: HERO_SLIDE_DURATION, ease: HERO_SLIDE_EASE },
+      0
+    );
+
+    // 2. #username-bar-row fades in.
+    transitionTimeline.to(barRow, { opacity: 1, duration: BAR_FADE_IN_DURATION }, BAR_FADE_IN_START);
+
+    // 3. #chips-and-startover moves down to return to its starting position.
+    transitionTimeline.to(chipsAndStartover, { y: 0, duration: CHIPS_AND_STARTOVER_RETURN_DURATION }, 0);
+
+    // 4. #username-chips returns to its 1 scale.
+    transitionTimeline.fromTo(
+      usernameChipsEl,
+      { scale: CHIPS_SCALE_UP },
+      { scale: 1, duration: CHIPS_SCALE_RETURN_DURATION },
+      0
+    );
+
+    // 5. #username-chips returns to its left-aligned position on the x-axis.
+    transitionTimeline.fromTo(usernameChipsEl, { x: chipsDx }, { x: 0, duration: CHIPS_UNCENTER_DURATION }, 0);
+
+    // 6. #start-over-btn fades out.
+    transitionTimeline.to(startOverBtn, { opacity: 0, duration: START_OVER_FADE_OUT_DURATION }, 0);
+  });
 }
 
 // --- Username chip input --------------------------------------------------
@@ -732,18 +833,21 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-startOverBtn.addEventListener("click", () => {
+startOverBtn.addEventListener("click", async () => {
   currentRunId++; // invalidate any in-flight fetch from the previous run
+
+  renderErrorSummary([]);
+  showStatus(null);
+
+  // Play the reverse transition against the CURRENT chips first — clearing
+  // them before this would leave the animation with an empty, collapsed
+  // container to animate (and no visible "before" position to measure).
+  await showInputScreen();
 
   enteredUsernames = [];
   usernameChipsEl.innerHTML = "";
   updateSubmitState();
   usernameInput.value = "";
-
   document.getElementById("results").innerHTML = "";
-  renderErrorSummary([]);
-  showStatus(null);
-
-  showInputScreen();
   usernameInput.focus();
 });
