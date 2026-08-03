@@ -312,8 +312,13 @@ function renderFilmCard(film, userAvatars, totalOk) {
   const card = document.createElement("div");
   card.className = "film-card";
 
-  const posterWrap = document.createElement("div");
+  const filmHref = film.link ? `https://letterboxd.com${film.link}` : "#";
+
+  const posterWrap = document.createElement("a");
   posterWrap.className = "film-poster-wrap";
+  posterWrap.href = filmHref;
+  posterWrap.target = "_blank";
+  posterWrap.rel = "noopener noreferrer";
 
   const yearSuffix = film.year ? ` (${film.year})` : "";
 
@@ -339,7 +344,7 @@ function renderFilmCard(film, userAvatars, totalOk) {
   const titleEl = document.createElement("div");
   titleEl.className = "film-title";
   const titleLink = document.createElement("a");
-  titleLink.href = film.link ? `https://letterboxd.com${film.link}` : "#";
+  titleLink.href = filmHref;
   titleLink.target = "_blank";
   titleLink.rel = "noopener noreferrer";
   titleLink.textContent = film.title;

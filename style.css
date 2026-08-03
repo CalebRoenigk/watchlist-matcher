@@ -486,6 +486,7 @@ main.showing-results {
 }
 
 .film-poster-wrap {
+  display: block;
   position: relative;
   aspect-ratio: 2 / 3;
   border-radius: var(--radius);
