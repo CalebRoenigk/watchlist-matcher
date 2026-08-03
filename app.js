@@ -281,7 +281,7 @@ function renderAvatarStack(usernames, userAvatars) {
   return container;
 }
 
-function renderFilmCard(film, userAvatars) {
+function renderFilmCard(film, userAvatars, totalOk) {
   const card = document.createElement("div");
   card.className = "film-card";
 
@@ -304,7 +304,7 @@ function renderFilmCard(film, userAvatars) {
   }
 
   const badge = document.createElement("span");
-  badge.className = "film-count-badge";
+  badge.className = "film-count-badge" + (film.count === totalOk ? " -all" : "");
   badge.textContent = String(film.count);
   posterWrap.appendChild(badge);
   card.appendChild(posterWrap);
@@ -335,6 +335,16 @@ function renderFilmCard(film, userAvatars) {
   return card;
 }
 
+// Shortest to longest; unknown runtimes (fetch failed) sort last.
+function compareByRuntime(a, b) {
+  if (a.runtimeMinutes == null && b.runtimeMinutes == null) return a.title.localeCompare(b.title);
+  if (a.runtimeMinutes == null) return 1;
+  if (b.runtimeMinutes == null) return -1;
+  return a.runtimeMinutes - b.runtimeMinutes || a.title.localeCompare(b.title);
+}
+
+// All matched films in a single grid: highest share-count first, then
+// shortest-to-longest runtime within the same count.
 function renderResultsGrid(ranked, totalOk, userAvatars) {
   const container = document.getElementById("results");
   container.innerHTML = "";
@@ -347,44 +357,12 @@ function renderResultsGrid(ranked, totalOk, userAvatars) {
     return;
   }
 
-  const tiers = new Map(); // count -> films[]
-  for (const film of ranked) {
-    if (!tiers.has(film.count)) tiers.set(film.count, []);
-    tiers.get(film.count).push(film);
-  }
+  const sorted = ranked.slice().sort((a, b) => b.count - a.count || compareByRuntime(a, b));
 
-  const counts = [...tiers.keys()].sort((a, b) => b - a);
-  let cardIndex = 0;
-  for (const count of counts) {
-    const section = document.createElement("section");
-    section.className = "result-tier";
-
-    const heading = document.createElement("h2");
-    heading.textContent =
-      count === totalOk ? `In all ${totalOk} watchlists` : `In ${count} of ${totalOk} watchlists`;
-    section.appendChild(heading);
-
-    const grid = document.createElement("div");
-    grid.className = "film-grid";
-    for (const film of sortByRuntime(tiers.get(count))) {
-      const card = renderFilmCard(film, userAvatars);
-      card.style.animationDelay = `${Math.min(cardIndex * CARD_STAGGER_MS, CARD_STAGGER_MAX_MS)}ms`;
-      cardIndex++;
-      grid.appendChild(card);
-    }
-    section.appendChild(grid);
-
-    container.appendChild(section);
-  }
-}
-
-// Shortest to longest; unknown runtimes (fetch failed) sort last.
-function sortByRuntime(films) {
-  return films.slice().sort((a, b) => {
-    if (a.runtimeMinutes == null && b.runtimeMinutes == null) return a.title.localeCompare(b.title);
-    if (a.runtimeMinutes == null) return 1;
-    if (b.runtimeMinutes == null) return -1;
-    return a.runtimeMinutes - b.runtimeMinutes || a.title.localeCompare(b.title);
+  sorted.forEach((film, index) => {
+    const card = renderFilmCard(film, userAvatars, totalOk);
+    card.style.animationDelay = `${Math.min(index * CARD_STAGGER_MS, CARD_STAGGER_MAX_MS)}ms`;
+    container.appendChild(card);
   });
 }
 
@@ -439,106 +417,142 @@ function showStatus(message) {
   statusTextEl.textContent = message;
 }
 
-// --- Username form UI ---------------------------------------------------
+// --- Screens ------------------------------------------------------------
 
-const usernameRowsEl = document.getElementById("username-rows");
-const addRowBtn = document.getElementById("add-row-btn");
+const inputScreen = document.getElementById("input-screen");
+const resultsScreen = document.getElementById("results-screen");
+
+function showInputScreen() {
+  resultsScreen.hidden = true;
+  inputScreen.hidden = false;
+}
+
+function showResultsScreen() {
+  inputScreen.hidden = true;
+  resultsScreen.hidden = false;
+}
+
+// --- Username chip input --------------------------------------------------
+
+const usernameInput = document.getElementById("username-input");
+const usernameChipsEl = document.getElementById("username-chips");
+const resultsChipsEl = document.getElementById("results-chips");
 const submitBtn = document.getElementById("submit-btn");
 const form = document.getElementById("matcher-form");
+const startOverBtn = document.getElementById("start-over-btn");
 
-function createUsernameRow() {
-  const row = document.createElement("div");
-  row.className = "username-row";
+let enteredUsernames = [];
 
-  const input = document.createElement("input");
-  input.type = "text";
-  input.placeholder = "letterboxd username";
-  input.autocomplete = "off";
-  input.spellcheck = false;
-  input.addEventListener("input", updateSubmitState);
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "remove-row-btn";
-  removeBtn.textContent = "×";
-  removeBtn.setAttribute("aria-label", "Remove this account");
-  removeBtn.addEventListener("click", () => {
-    row.remove();
-    updateRemoveButtonsState();
-    updateSubmitState();
-  });
-
-  row.appendChild(input);
-  row.appendChild(removeBtn);
-  return row;
+function hasUsername(name) {
+  const key = name.toLowerCase();
+  return enteredUsernames.some((u) => u.toLowerCase() === key);
 }
 
-function updateRemoveButtonsState() {
-  const rows = [...usernameRowsEl.querySelectorAll(".username-row")];
-  rows.forEach((row) => {
-    row.querySelector(".remove-row-btn").disabled = rows.length <= MIN_USERNAMES;
-  });
+function addUsername(rawName) {
+  const name = rawName.trim();
+  if (!name || hasUsername(name)) return;
+  enteredUsernames.push(name);
+  renderUsernameChips();
+  updateSubmitState();
 }
 
-function getEnteredUsernames() {
-  const inputs = [...usernameRowsEl.querySelectorAll("input[type=text]")];
-  const raw = inputs.map((input) => input.value.trim()).filter(Boolean);
+function removeUsername(name) {
+  enteredUsernames = enteredUsernames.filter((u) => u !== name);
+  renderUsernameChips();
+  updateSubmitState();
+}
 
-  const seen = new Set();
-  const usernames = [];
-  let hadDuplicates = false;
-  for (const name of raw) {
-    const key = name.toLowerCase();
-    if (seen.has(key)) {
-      hadDuplicates = true;
-      continue;
-    }
-    seen.add(key);
-    usernames.push(name);
+function createUsernameChip(name, removable) {
+  const chip = document.createElement("span");
+  chip.className = "username-chip";
+
+  const label = document.createElement("span");
+  label.textContent = `@${name}`;
+  chip.appendChild(label);
+
+  if (removable) {
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "chip-remove";
+    removeBtn.textContent = "×";
+    removeBtn.setAttribute("aria-label", `Remove @${name}`);
+    removeBtn.addEventListener("click", () => removeUsername(name));
+    chip.appendChild(removeBtn);
   }
-  return { usernames, hadDuplicates };
+
+  return chip;
+}
+
+function renderUsernameChips() {
+  usernameChipsEl.innerHTML = "";
+  for (const name of enteredUsernames) {
+    usernameChipsEl.appendChild(createUsernameChip(name, true));
+  }
+}
+
+function renderResultsChips(usernames) {
+  resultsChipsEl.innerHTML = "";
+  for (const name of usernames) {
+    resultsChipsEl.appendChild(createUsernameChip(name, false));
+  }
 }
 
 function updateSubmitState() {
-  submitBtn.disabled = getEnteredUsernames().usernames.length < MIN_USERNAMES;
+  submitBtn.disabled = enteredUsernames.length < MIN_USERNAMES;
 }
 
-function setFormDisabled(disabled) {
-  addRowBtn.disabled = disabled;
-  usernameRowsEl.querySelectorAll("input, button").forEach((el) => {
-    el.disabled = disabled;
-  });
-  if (!disabled) updateRemoveButtonsState();
-  updateSubmitState();
-  if (disabled) submitBtn.disabled = true;
+function commitPendingInput() {
+  if (usernameInput.value.trim()) {
+    addUsername(usernameInput.value);
+    usernameInput.value = "";
+  }
 }
 
-addRowBtn.addEventListener("click", () => {
-  usernameRowsEl.appendChild(createUsernameRow());
-  updateRemoveButtonsState();
-  updateSubmitState();
+// A space commits the token before it into a chip (typing one name at a
+// time); pasting several space-separated names at once works the same way,
+// committing every complete token and leaving any trailing partial one (no
+// following space yet) in the box for continued editing.
+usernameInput.addEventListener("input", () => {
+  const value = usernameInput.value;
+  if (!/\s/.test(value)) return;
+  const endsWithSpace = /\s$/.test(value);
+  const tokens = value.split(/\s+/).filter(Boolean);
+  const toCommit = endsWithSpace ? tokens : tokens.slice(0, -1);
+  const remainder = endsWithSpace ? "" : tokens[tokens.length - 1] || "";
+  toCommit.forEach(addUsername);
+  usernameInput.value = remainder;
 });
 
-for (let i = 0; i < MIN_USERNAMES; i++) {
-  usernameRowsEl.appendChild(createUsernameRow());
-}
-updateRemoveButtonsState();
+usernameInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    commitPendingInput();
+  }
+});
 
 // --- Submit orchestration -----------------------------------------------
 
+let currentRunId = 0;
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  commitPendingInput();
+  if (enteredUsernames.length < MIN_USERNAMES) return;
 
-  const { usernames, hadDuplicates } = getEnteredUsernames();
-  if (usernames.length < MIN_USERNAMES) return;
+  const usernames = enteredUsernames.slice();
+  const runId = ++currentRunId;
 
-  setFormDisabled(true);
+  showResultsScreen();
+  renderResultsChips(usernames);
   document.getElementById("results").innerHTML = "";
   renderErrorSummary([]);
-  showStatus(hadDuplicates ? "Duplicate usernames were removed. Fetching watchlists…" : "Fetching watchlists…");
+  showStatus("Fetching watchlists…");
 
   try {
-    const { ok, errors } = await fetchAllWatchlists(usernames, showStatus);
+    const { ok, errors } = await fetchAllWatchlists(usernames, (msg) => {
+      if (runId === currentRunId) showStatus(msg);
+    });
+    if (runId !== currentRunId) return; // superseded by a new search or Start Over
 
     if (ok.length < MIN_USERNAMES) {
       showStatus(null);
@@ -558,18 +572,34 @@ form.addEventListener("submit", async (event) => {
 
     if (ranked.length > 0) {
       showStatus(`Fetching film details (0/${ranked.length})…`);
-      await fetchFilmDetailsWithConcurrency(ranked, FILM_DETAILS_CONCURRENCY, (done, total) =>
-        showStatus(`Fetching film details (${done}/${total})…`)
-      );
+      await fetchFilmDetailsWithConcurrency(ranked, FILM_DETAILS_CONCURRENCY, (done, total) => {
+        if (runId === currentRunId) showStatus(`Fetching film details (${done}/${total})…`);
+      });
+      if (runId !== currentRunId) return;
     }
 
     showStatus(null);
     renderResultsGrid(ranked, ok.length, userAvatars);
     renderErrorSummary(errors);
   } catch (err) {
+    if (runId !== currentRunId) return;
     showStatus(null);
     renderErrorSummary([{ username: "", error: err }]);
-  } finally {
-    setFormDisabled(false);
   }
+});
+
+startOverBtn.addEventListener("click", () => {
+  currentRunId++; // invalidate any in-flight fetch from the previous run
+
+  enteredUsernames = [];
+  renderUsernameChips();
+  updateSubmitState();
+  usernameInput.value = "";
+
+  document.getElementById("results").innerHTML = "";
+  renderErrorSummary([]);
+  showStatus(null);
+
+  showInputScreen();
+  usernameInput.focus();
 });

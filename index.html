@@ -6,39 +6,52 @@
   <meta name="color-scheme" content="dark" />
   <title>Letterboxd Watchlist Matcher</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <header class="page-header">
     <div class="title-row">
-      <img src="assets/favicon.svg" alt="" class="title-icon" width="32" height="32" />
-      <h1>Letterboxd Watchlist Matcher</h1>
+      <img src="assets/favicon.svg" alt="" class="title-icon" width="40" height="40" />
+      <h1>Watchlist Matcher</h1>
     </div>
     <p class="subtitle">
-      Enter a few Letterboxd usernames and find the movies on more than one of their watchlists.
+      Enter multiple Letterboxd usernames to find shared movies across their watchlists.
     </p>
   </header>
 
   <main>
-    <form id="matcher-form">
-      <div id="username-rows" class="username-rows"></div>
+    <section id="input-screen">
+      <form id="matcher-form">
+        <div class="username-bar-row">
+          <input
+            type="text"
+            id="username-input"
+            class="username-bar"
+            placeholder="Enter Letterboxd usernames separated by a space"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
+        </div>
 
-      <div class="form-actions">
-        <button type="button" id="add-row-btn" class="btn btn-secondary">+ Add another account</button>
-        <button type="submit" id="submit-btn" class="btn btn-primary" disabled>Find shared movies</button>
-      </div>
-
-      <p id="form-hint" class="form-hint">Enter at least 2 usernames to compare.</p>
-    </form>
-
-    <section id="status" class="status" hidden aria-live="polite">
-      <img src="assets/loading-icon.svg" alt="" class="status-icon" width="24" height="24" />
-      <span id="status-text"></span>
+        <div id="username-chips" class="username-chips"></div>
+      </form>
     </section>
 
-    <section id="errors" class="errors" hidden></section>
+    <section id="results-screen" hidden>
+      <div id="results-chips" class="username-chips"></div>
 
-    <section id="results" class="results"></section>
+      <button type="button" id="start-over-btn" class="btn btn-accent">Start over</button>
+
+      <section id="status" class="status" hidden aria-live="polite">
+        <img src="assets/loading-icon.svg" alt="" class="status-icon" width="24" height="24" />
+        <span id="status-text"></span>
+      </section>
+
+      <section id="errors" class="errors" hidden></section>
+
+      <div id="results" class="results film-grid"></div>
+    </section>
   </main>
 
   <footer class="page-footer">
@@ -48,6 +61,6 @@
     </p>
   </footer>
 
-  <script src="app.js?v=1" defer></script>
+  <script src="app.js?v=2" defer></script>
 </body>
 </html>
