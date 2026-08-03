@@ -14,6 +14,9 @@ const MIN_USERNAMES = 2;
 const MAX_PAGES = 60; // safety cap (~1680 films/user)
 const PAGE_DELAY_MS_RANGE = [150, 250]; // politeness delay between paginated requests
 const FILM_DETAILS_CONCURRENCY = 5;
+const CARD_STAGGER_MS = 15;
+const CARD_STAGGER_MAX_MS = 300;
+const STATUS_FADE_MS = 300;
 
 // --- Errors -------------------------------------------------------------
 
@@ -351,6 +354,7 @@ function renderResultsGrid(ranked, totalOk, userAvatars) {
   }
 
   const counts = [...tiers.keys()].sort((a, b) => b - a);
+  let cardIndex = 0;
   for (const count of counts) {
     const section = document.createElement("section");
     section.className = "result-tier";
@@ -363,7 +367,10 @@ function renderResultsGrid(ranked, totalOk, userAvatars) {
     const grid = document.createElement("div");
     grid.className = "film-grid";
     for (const film of sortByRuntime(tiers.get(count))) {
-      grid.appendChild(renderFilmCard(film, userAvatars));
+      const card = renderFilmCard(film, userAvatars);
+      card.style.animationDelay = `${Math.min(cardIndex * CARD_STAGGER_MS, CARD_STAGGER_MAX_MS)}ms`;
+      cardIndex++;
+      grid.appendChild(card);
     }
     section.appendChild(grid);
 
@@ -405,15 +412,30 @@ function renderErrorSummary(errors) {
   container.appendChild(list);
 }
 
+let statusHideTimeout = null;
+
 function showStatus(message) {
   const statusEl = document.getElementById("status");
   const statusTextEl = document.getElementById("status-text");
+
+  if (statusHideTimeout) {
+    clearTimeout(statusHideTimeout);
+    statusHideTimeout = null;
+  }
+
   if (!message) {
-    statusEl.hidden = true;
-    statusTextEl.textContent = "";
+    statusEl.classList.add("status-fade-out");
+    statusHideTimeout = setTimeout(() => {
+      statusEl.hidden = true;
+      statusEl.classList.remove("status-fade-out");
+      statusTextEl.textContent = "";
+      statusHideTimeout = null;
+    }, STATUS_FADE_MS);
     return;
   }
+
   statusEl.hidden = false;
+  statusEl.classList.remove("status-fade-out");
   statusTextEl.textContent = message;
 }
 

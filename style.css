@@ -203,14 +203,22 @@ main {
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.9rem;
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 .status[hidden] {
   display: none;
 }
 
+.status.status-fade-out {
+  opacity: 0;
+}
+
 .status-icon {
   flex-shrink: 0;
+  max-width: 128px;
+  max-height: 128px;
 }
 
 .errors {
@@ -261,10 +269,22 @@ main {
   gap: 1.1rem;
 }
 
+@keyframes film-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .film-card {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  animation: film-card-in 0.35s ease both;
 }
 
 .film-poster-wrap {
@@ -379,4 +399,13 @@ main {
   padding: 2rem 1.5rem 3rem;
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status {
+    transition: none;
+  }
+  .film-card {
+    animation: none;
+  }
 }
